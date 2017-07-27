@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">Arduator</string>
+
+    <string-array name="bt_modes_array">
+        <item>2.0</item>
+        <item>4.0 LE</item>
+    </string-array>
+</resources>
