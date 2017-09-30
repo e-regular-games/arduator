@@ -39,7 +39,7 @@ public class MainActivity extends AppCompatActivity {
 
     private ActivityConfig config;
     private ArduinoCommManagerAny arduinoMgr;
-    private Button btnSearchStart, btnSearchStop, btnUpload;
+    private Button btnSearchStart, btnSearchStop, btnUpload, btnSourceCode, btnHelp, btnAbout;
     private ImageButton btnFileLookup;
     private LinearLayout layoutStatus;
     private TextView textStatus, textService, textPin;
@@ -279,6 +279,10 @@ public class MainActivity extends AppCompatActivity {
         spnMode = (Spinner) findViewById(R.id.bt_dropdown_mode);
         editFile = (EditText) findViewById(R.id.bt_edit_file);
 
+        btnHelp = (Button) findViewById(R.id.bt_button_help);
+        btnSourceCode = (Button) findViewById(R.id.bt_button_src);
+        btnAbout = (Button) findViewById(R.id.bt_button_about);
+
         spnDevicesAdapter = new ArrayAdapter<BtFoundDevice>(MainActivity.this, android.R.layout.simple_spinner_item);
         spnDevicesAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
 
@@ -368,6 +372,32 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void afterTextChanged(Editable s) {
                 config.setBtServiceUuid(s.toString());
+            }
+        });
+
+        btnSourceCode.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String url = "https://gitlab.com/dayoldryebread/arduator";
+                Intent i = new Intent(Intent.ACTION_VIEW);
+                i.setData(Uri.parse(url));
+                startActivity(i);
+            }
+        });
+
+        btnHelp.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(MainActivity.this, HelpActivity.class);
+                startActivity(intent);
+            }
+        });
+
+        btnAbout.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(MainActivity.this, AboutActivity.class);
+                startActivity(intent);
             }
         });
 
