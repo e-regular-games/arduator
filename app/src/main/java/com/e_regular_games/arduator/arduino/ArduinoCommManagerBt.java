@@ -11,9 +11,10 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 /**
- * Created by SRE on 6/18/2017.
+ * @author S. Ryan Edgar
+ * Class used to discover and connect to Bluetooth 2.0 devices. If your intend to support
+ * Bluetooth 2 and 4 it is suggested to use ArduinoCommManagerAny.
  */
-
 public class ArduinoCommManagerBt extends ArduinoCommManager {
 
     public ArduinoCommManagerBt(Activity app) {
@@ -36,7 +37,7 @@ public class ArduinoCommManagerBt extends ArduinoCommManager {
             return;
         }
 
-        onStatusChange("Searching...");
+        onStatusChange(BluetoothStatus.Searching);
         stopFindTask = new TimerTask() {
             @Override
             public void run() {
@@ -63,12 +64,12 @@ public class ArduinoCommManagerBt extends ArduinoCommManager {
             app.unregisterReceiver(mReceiver);
             mBt.cancelDiscovery();
             findInProgress = false;
-            onStatusChange("Enabled");
+            onStatusChange(BluetoothStatus.Enabled);
         }
     }
 
     @Override
-    public void createStation(final BluetoothDevice device) {
+    public void createArduinoComm(final BluetoothDevice device) {
         AfterEnable afterEnableCreate = new AfterEnable() {
             @Override
             public void after() {
@@ -82,7 +83,7 @@ public class ArduinoCommManagerBt extends ArduinoCommManager {
         }
 
         if (findInProgress) {
-            onStatusChange("Enabled");
+            onStatusChange(BluetoothStatus.Enabled);
             cancelFind();
         }
 

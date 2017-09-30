@@ -9,19 +9,24 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 
 /**
- * Created by SRE on 6/9/2017.
+ * @author S. Ryan Edgar
+ * Reads an input stream which provides intel based hex codes for Arduino Firmware. It verifies
+ * the checksum of each line during load.
+ *
+ * https://en.wikipedia.org/wiki/Intel_HEX
  */
-
 public class Firmware {
-    public Firmware(Activity app, String fileName) {
-        this.app = app;
-        this.fileName = fileName;
-    }
+    public Firmware() {}
 
-    public boolean load() {
+    /**
+     * Read the firmware from the provided stream and save it in this object.
+     * @param in Stream containing the data of the firmware file.
+     * @return true, if the file is valid, else false. If the file is invalid, getLastError will
+     * indicate what went wrong.
+     */
+    public boolean load(InputStream in) {
         try {
-            InputStream hex = app.getAssets().open(fileName);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(hex));
+            BufferedReader reader = new BufferedReader(new InputStreamReader(in));
 
             String line;
             boolean firstLine = true;
@@ -57,6 +62,8 @@ public class Firmware {
                 firstLine = false;
                 nextAddress = address + dataLen;
             }
+
+            in.close();
         } catch (IOException e) {
             lastError = ErrorCode.FW_FileName;
             return false;
@@ -71,16 +78,21 @@ public class Firmware {
         return startAddress;
     }
 
+    /**
+     * @return an error code, if load returned false.
+     */
     public ErrorCode getError() {
         return lastError;
     }
 
+    /**
+     * @return each byte of the program as an integer, to avoid negative number issues. Only the
+     * lowest 8bits of each integer are valid, the rest should be ignored.
+     */
     public ArrayList<Integer> getBytes() {
         return bytes;
     }
 
-    private Activity app;
-    private String fileName;
     private int startAddress = 0;
     private ErrorCode lastError;
     private ArrayList<Integer> bytes = new ArrayList<>();

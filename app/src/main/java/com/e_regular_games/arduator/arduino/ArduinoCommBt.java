@@ -19,7 +19,11 @@ import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.UUID;
+import java.util.jar.Pack200;
 
+/**
+ * @author S. Ryan Edgar
+ */
 public class ArduinoCommBt extends ArduinoComm {
 
     public ArduinoCommBt(Activity app, BluetoothDevice device) {
@@ -29,10 +33,16 @@ public class ArduinoCommBt extends ArduinoComm {
 
     public void connect() {
         if (!connected) {
+            if (pinCode == null) {
+                onError(ErrorCode.PinRequired);
+                return;
+            }
+
             if (device.getBondState() != BluetoothDevice.BOND_NONE) {
                 deleteBondInformation();
                 if (device.getBondState() != BluetoothDevice.BOND_NONE) {
                     onError(ErrorCode.RemovePairing);
+                    return;
                 }
             }
 
@@ -68,52 +78,22 @@ public class ArduinoCommBt extends ArduinoComm {
         }
     }
 
+    public void send(int[] packet) {
+        connThread.write(packet);
+    }
+
     public void setPinCode(String pin) {
         pinCode = pin;
     }
 
     private ConnectionThread connThread;
-    private ArrayList<Byte> toParse = new ArrayList<>();
-    private Map<Integer, byte[]> toAck = new HashMap<>();
-    private boolean messageAtHead = false;
     private boolean connected = false;
-    private Timer timer = new Timer();
     private String pinCode;
 
     private interface MessageConstants {
         int READ = 1;
         int ERROR = 2;
         int STATUS = 4;
-        int ACTION = 8;
-    }
-
-    protected void recvAck(int counter) {
-        toAck.remove(counter);
-    }
-
-    private class AckCheck extends TimerTask {
-
-        private int id;
-        private Handler messenger;
-
-        public AckCheck(int id, Handler handler) {
-            this.id = id;
-            messenger = handler;
-        }
-
-        @Override
-        public void run() {
-            if (toAck.containsKey(id)) {
-                messenger.obtainMessage(MessageConstants.STATUS, StatusCode.UnstableConnection).sendToTarget();
-            }
-        }
-    }
-
-    protected void send(int id, byte[] packet) {
-        toAck.put(id, packet);
-        timer.schedule(new AckCheck(id, messenger), 500);
-
-        connThread.write(packet);
     }
 
     private Handler messenger = new Handler(new Handler.Callback() {
@@ -129,12 +109,7 @@ public class ArduinoCommBt extends ArduinoComm {
                     break;
 
                 case MessageConstants.READ:
-                    byte bytes[] = (byte[]) message.obj;
-                    for (int i = 0; i < message.arg1 && i < bytes.length; i += 1) {
-                        toParse.add(bytes[i]);
-                    }
-
-                    messageAtHead = parsePending(toParse, messageAtHead);
+                    onContent(message.arg1, (byte[]) message.obj);
                     break;
             }
 
@@ -209,8 +184,10 @@ public class ArduinoCommBt extends ArduinoComm {
                 try {
                     // Read from the InputStream.
                     numBytes = recvStream.read(buffer);
-                    // Send the obtained bytes to the UI activity.
-                    messenger.obtainMessage(MessageConstants.READ, numBytes, -1, buffer).sendToTarget();
+
+                    if (numBytes > 0) {
+                        messenger.obtainMessage(MessageConstants.READ, numBytes, -1, buffer).sendToTarget();
+                    }
                 } catch (IOException e) {
                     if (!closed) {
                         messenger.obtainMessage(MessageConstants.ERROR, ErrorCode.Receive).sendToTarget();
@@ -221,9 +198,15 @@ public class ArduinoCommBt extends ArduinoComm {
         }
 
         // Call this from the main activity to send data to the remote device.
-        public void write(byte[] bytes) {
+        public void write(int[] bytes) {
             try {
-                sendStream.write(bytes);
+                System.out.print("Send: ");
+                for (int i = 0; i < bytes.length; i += 1) {
+                    System.out.print(Integer.toString(bytes[i]) + " ");
+                    sendStream.write(bytes[i]);
+                }
+                sendStream.flush();
+                System.out.println();
             } catch (IOException e) {
                 if (!closed) {
                     messenger.obtainMessage(MessageConstants.ERROR, ErrorCode.Send).sendToTarget();

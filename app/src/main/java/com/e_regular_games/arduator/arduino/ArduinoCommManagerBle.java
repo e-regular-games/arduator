@@ -13,9 +13,10 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 /**
- * Created by SRE on 5/24/2017.
+ * @author S. Ryan Edgar
+ * A derived class of ArduinoCommManager specifically for finding and creatng ArduinoCommBle
+ * devices, ie Bluetooth 4.0 LE devices.
  */
-
 public class ArduinoCommManagerBle extends ArduinoCommManager {
 
     public ArduinoCommManagerBle(Activity parent) {
@@ -43,7 +44,7 @@ public class ArduinoCommManagerBle extends ArduinoCommManager {
         if (finding || !enableFind()) {
             return;
         }
-        onStatusChange("Searching...");
+        onStatusChange(BluetoothStatus.Searching);
         finding = true;
 
         stopFindTask = new TimerTask() {
@@ -52,7 +53,7 @@ public class ArduinoCommManagerBle extends ArduinoCommManager {
                 mBt.stopLeScan(scanLeDevices);
                 finding = false;
                 stopFindTask = null;
-                onStatusChange("Enabled");
+                onStatusChange(BluetoothStatus.Enabled);
             }
         };
 
@@ -76,16 +77,17 @@ public class ArduinoCommManagerBle extends ArduinoCommManager {
             super.addOnManagerEvent(onEvent);
 
             if (finding) {
-                onEvent.onStatusChange("Searching...");
+                onEvent.onStatusChange(BluetoothStatus.Searching);
             } else if (btAvailable || mBt.isEnabled()) {
-                onEvent.onStatusChange("Enabled");
+                onEvent.onStatusChange(BluetoothStatus.Enabled);
             } else {
-                onEvent.onStatusChange("Disabled");
+                onEvent.onStatusChange(BluetoothStatus.Disabled);
             }
         }
     }
 
-    public void createStation(final BluetoothDevice device) {
+    @Override
+    public void createArduinoComm(final BluetoothDevice device) {
         AfterEnable afterEnableCreate = new AfterEnable() {
             @Override
             public void after() {
@@ -99,7 +101,7 @@ public class ArduinoCommManagerBle extends ArduinoCommManager {
         }
 
         if (finding) {
-            onStatusChange("Enabled");
+            onStatusChange(BluetoothStatus.Enabled);
             cancelFind();
         }
 

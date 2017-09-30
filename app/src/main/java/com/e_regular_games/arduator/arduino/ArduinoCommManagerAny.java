@@ -6,10 +6,16 @@ import android.bluetooth.BluetoothDevice;
 import java.util.ArrayList;
 
 /**
- * Created by SRE on 7/3/2017.
+ * A derived class of ArduinoCommManager which represents any Bluetooth mode (ie 2.0 or 4.0 LE).
+ * This provides a way to switch managers while allow all other parts of the application to hold
+ * on to the same object, ie an instance of ArduinoCommManagerAny.
  */
-
 public class ArduinoCommManagerAny extends ArduinoCommManager {
+
+    /**
+     * @param parent The parent Activity.
+     * @param mode Either "2.0" or "4.0 LE".
+     */
     public ArduinoCommManagerAny(Activity parent, String mode) {
         super(parent);
         this.parent = parent;
@@ -17,6 +23,9 @@ public class ArduinoCommManagerAny extends ArduinoCommManager {
         setMode(mode);
     }
 
+    /**
+     * @param mode Either "2.0" or "4.0 LE".
+     */
     public void setMode(String mode) {
         if (any != null) {
             any.cancelFind();
@@ -46,8 +55,8 @@ public class ArduinoCommManagerAny extends ArduinoCommManager {
     }
 
     @Override
-    public void createStation(BluetoothDevice device) {
-        any.createStation(device);
+    public void createArduinoComm(BluetoothDevice device) {
+        any.createArduinoComm(device);
     }
 
     @Override

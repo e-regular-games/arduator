@@ -9,6 +9,17 @@ import java.util.ArrayList;
 
 import static android.app.Activity.RESULT_OK;
 
+/**
+ * A class used to search for Bluetooth devices. Once found a ArduinoComm object can be
+ * created from the Bluetooth device. This classes uses the ArduinoCommManager.ManagerEvent API
+ * to indicate when events happen.
+ *
+ * This class is responsible for enabling Bluetooth and requesting appropriate permissions.
+ *
+ * ** IMPORTANT **
+ * Your Activity must call onRequestPermissionResult and onActivityResult on ArduinoCommManager
+ * when those functions are called on the Activity.
+ */
 public abstract class ArduinoCommManager {
 
     public ArduinoCommManager(Activity parent) {
@@ -16,14 +27,16 @@ public abstract class ArduinoCommManager {
         mBt = BluetoothAdapter.getDefaultAdapter();
     }
 
+    public enum BluetoothStatus {Enabled, Disabled, Searching, Error}
+
     public static class ManagerEvent {
         public void onFind(BluetoothDevice device, boolean saved) {
         }
 
-        public void onStatusChange(String state) {
+        public void onStatusChange(BluetoothStatus state) {
         }
 
-        public void onCreateStation(ArduinoComm station) {
+        public void onCreate(ArduinoComm arduino) {
         }
     }
 
@@ -31,20 +44,24 @@ public abstract class ArduinoCommManager {
 
     public abstract void cancelFind();
 
-    public abstract void createStation(final BluetoothDevice device);
+    public abstract void createArduinoComm(final BluetoothDevice device);
 
     public abstract void onRequestPermissionResult(int requestCode, String permissions[], int grantResults[]);
 
     // must be called from the parent activity in the corresponding similarly name function.
     public void onActivityResult(int requestCode, int responseCode) {
-        if (requestCode == REQUEST_ENABLE_BT && responseCode == RESULT_OK) {
-            btAvailable = true;
-            onStatusChange("Enabled");
+        if (requestCode == REQUEST_ENABLE_BT) {
+            if (responseCode == RESULT_OK) {
+                btAvailable = true;
+                onStatusChange(BluetoothStatus.Enabled);
 
-            ArrayList<AfterEnable> copy = new ArrayList<>(afterEnable);
-            afterEnable.clear();
-            for (int i = 0; i < copy.size(); i += 1) {
-                copy.get(i).after();
+                ArrayList<AfterEnable> copy = new ArrayList<>(afterEnable);
+                afterEnable.clear();
+                for (int i = 0; i < copy.size(); i += 1) {
+                    copy.get(i).after();
+                }
+            } else {
+                onStatusChange(BluetoothStatus.Error);
             }
         }
     }
@@ -85,14 +102,14 @@ public abstract class ArduinoCommManager {
         }
 
         if (!btAvailable) {
-            onStatusChange("Enabled");
+            onStatusChange(BluetoothStatus.Enabled);
         }
 
         btAvailable = true;
         return true;
     }
 
-    protected void onStatusChange(final String status) {
+    protected void onStatusChange(final BluetoothStatus status) {
         app.runOnUiThread(new Runnable() {
             @Override
             public void run() {
@@ -114,12 +131,12 @@ public abstract class ArduinoCommManager {
         });
     }
 
-    protected void onCreateStation(final ArduinoComm station) {
+    protected void onCreateStation(final ArduinoComm arduino) {
         app.runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 for (ManagerEvent e : onEvents) {
-                    e.onCreateStation(station);
+                    e.onCreate(arduino);
                 }
             }
         });

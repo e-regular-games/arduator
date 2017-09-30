@@ -19,15 +19,78 @@ import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Created by SRE on 5/28/2017.
+ * @author S. Ryan Edgar
+ * Communicate with a Bluetooth 4.0 Low-Energy device. You must set the service id before
+ * attempting to connect to the device.
  */
-
 public class ArduinoCommBle extends ArduinoComm {
+    
+    public ArduinoCommBle(Activity app, BluetoothDevice device) {
+        super(app, device);
+    }
+
+    /**
+     * @param uuid the last 4 hex characters of the UUID representing the Serial port service.
+     */
+    public void setServiceId(String uuid) {
+        serviceId = uuid;
+    }
+
+    @Override
+    public void connect() {
+        if (!connected) {
+            if (serviceId == null) {
+                onError(ErrorCode.ServiceIdRequired);
+                return;
+            }
+
+            if (device.getBondState() != BluetoothDevice.BOND_NONE) {
+                deleteBondInformation();
+                if (device.getBondState() != BluetoothDevice.BOND_NONE) {
+                    onError(ErrorCode.RemovePairing);
+                }
+            }
+
+            btGatt = device.connectGatt(app, false, btgCallback);
+            onStatus(StatusCode.Connecting);
+
+            // will be canceled if connection is successful or explicitly fails.
+            taskConnectTimeout = new TimerTask() {
+                @Override
+                public void run() {
+                    onError(ErrorCode.Connect);
+                    btGatt.disconnect();
+                }
+            };
+            timer.schedule(taskConnectTimeout, 10000);
+        }
+    }
+
+    @Override
+    public void disconnect() {
+        if (connected) {
+            taskConnectTimeout.cancel();
+            pendingWrite = false;
+            toSend.clear();
+            onStatus(StatusCode.Disconnecting);
+            btGatt.disconnect();
+        }
+    }
+
+    @Override
+    public void send(int packet[]) {
+        for (int i = 0; i < packet.length; i += 1) {
+            toSend.add(packet[i]);
+        }
+
+        if (!pendingWrite) {
+            pendingWrite = true;
+            sendNextChunk();
+        }
+    }
 
     private BluetoothGatt btGatt;
-    private ArrayList<Byte> toParse = new ArrayList<>();
-    private boolean messageAtHead = false;
-    private ArrayList<Byte> toSend = new ArrayList<>();
+    private ArrayList<Integer> toSend = new ArrayList<>();
     private boolean pendingWrite = false;
 
     private Handler messenger = new Handler(new Handler.Callback() {
@@ -47,19 +110,15 @@ public class ArduinoCommBle extends ArduinoComm {
                     break;
 
                 case MessageConstants.READ:
-                    byte bytes[] = (byte[]) message.obj;
-                    for (int i = 0; i < bytes.length; i += 1) {
-                        toParse.add(bytes[i]);
-                    }
-
-                    messageAtHead = parsePending(toParse, messageAtHead);
+                    byte[] content = (byte[]) message.obj;
+                    onContent(content.length, content);
                     break;
             }
 
             return false;
         }
     });
-    private BluetoothGattCallback btgCallback = new BaseStationGattCallback(messenger);
+    private BluetoothGattCallback btgCallback = new ArduinoGattCallback(messenger);
 
     private enum ActionCode {InitSerialService, WriteNext}
 
@@ -67,19 +126,9 @@ public class ArduinoCommBle extends ArduinoComm {
     private BluetoothGattCharacteristic charSerial;
     private boolean connected = false;
 
-    private Map<Integer, byte[]> toAck = new ConcurrentHashMap<>();
     private Timer timer = new Timer();
     private TimerTask taskConnectTimeout;
-
-
-    public ArduinoCommBle(Activity app, BluetoothDevice device) {
-        super(app, device);
-    }
-
-    public void setServiceId(String uuid) {
-        serviceId = uuid;
-    }
-
+    
     private interface MessageConstants {
         int READ = 1;
         int ERROR = 2;
@@ -98,88 +147,23 @@ public class ArduinoCommBle extends ArduinoComm {
         }
     }
 
+    /**
+     * For BLE we can only send 20 bytes at a time.
+     * Convert the integers from toSend and turn them into bytes.
+     * Ensure btGatt is valid, because sendNextChunk can be called after a disconnect.
+     */
     private void sendNextChunk() {
-        if (toSend.size() > 0) {
+        if (toSend.size() > 0 && btGatt != null) {
             int chunkSize = toSend.size() > 20 ? 20 : toSend.size();
             byte chunk[] = new byte[chunkSize];
             for (int i = 0; i < chunkSize; i += 1) {
-                chunk[i] = toSend.remove(0);
+                chunk[i] = toSend.remove(0).byteValue();
             }
 
             charSerial.setValue(chunk);
             btGatt.writeCharacteristic(charSerial);
         } else {
             pendingWrite = false;
-        }
-    }
-
-    @Override
-    public void connect() {
-        if (!connected) {
-            if (device.getBondState() != BluetoothDevice.BOND_NONE) {
-                deleteBondInformation();
-                if (device.getBondState() != BluetoothDevice.BOND_NONE) {
-                    onError(ErrorCode.RemovePairing);
-                }
-            }
-
-            btGatt = device.connectGatt(app, false, btgCallback);
-            onStatus(StatusCode.Connecting);
-
-            // will be canceled if connection is successful or explicitly fails.
-            taskConnectTimeout = new TimerTask() {
-                @Override
-                public void run() {
-                    onError(ErrorCode.Connect);
-                    btGatt.disconnect();
-                }
-            };
-            timer.schedule(taskConnectTimeout, 6000);
-        }
-    }
-
-    @Override
-    public void disconnect() {
-        if (connected) {
-            taskConnectTimeout.cancel();
-            onStatus(StatusCode.Disconnecting);
-            btGatt.disconnect();
-        }
-    }
-
-    protected void recvAck(int counter) {
-        toAck.remove(counter);
-    }
-
-    private class AckCheck extends TimerTask {
-
-        private int id;
-        private Handler messenger;
-
-        public AckCheck(int id, Handler handler) {
-            this.id = id;
-            messenger = handler;
-        }
-
-        @Override
-        public void run() {
-            if (toAck.containsKey(id)) {
-                messenger.obtainMessage(MessageConstants.STATUS, StatusCode.UnstableConnection).sendToTarget();
-            }
-        }
-    }
-
-    protected void send(int id, byte packet[]) {
-        toAck.put(id, packet);
-        timer.schedule(new AckCheck(id, messenger), 500);
-
-        for (int i = 0; i < packet.length; i += 1) {
-            toSend.add(packet[i]);
-        }
-
-        if (!pendingWrite) {
-            pendingWrite = true;
-            sendNextChunk();
         }
     }
 
@@ -238,11 +222,11 @@ public class ArduinoCommBle extends ArduinoComm {
         btGatt.writeDescriptor(clientConfig);
     }
 
-    private class BaseStationGattCallback extends BluetoothGattCallback {
+    private class ArduinoGattCallback extends BluetoothGattCallback {
 
         private Handler messenger;
 
-        public BaseStationGattCallback(Handler handler) {
+        public ArduinoGattCallback(Handler handler) {
             messenger = handler;
         }
 
@@ -257,6 +241,7 @@ public class ArduinoCommBle extends ArduinoComm {
                 connected = false;
                 btGatt.close();
                 btGatt = null;
+                charSerial = null;
                 messenger.obtainMessage(MessageConstants.STATUS, StatusCode.Disconnected).sendToTarget();
             } else {
                 messenger.obtainMessage(MessageConstants.ERROR, ErrorCode.Connect).sendToTarget();
@@ -279,8 +264,6 @@ public class ArduinoCommBle extends ArduinoComm {
         @Override
         public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
             super.onCharacteristicRead(gatt, characteristic, status);
-
-            System.out.println("CharRead: " + Integer.toHexString(status));
         }
 
         @Override

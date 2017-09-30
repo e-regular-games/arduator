@@ -1,23 +1,25 @@
 package com.e_regular_games.arduator.arduino;
 
 import android.app.Activity;
-import android.bluetooth.BluetoothDevice;
 import android.os.Handler;
 import android.os.Message;
 
-import com.e_regular_games.arduator.arduino.Firmware;
-
-import java.lang.reflect.Method;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
 
 /**
- * Created by SRE on 6/9/2017.
+ * @author S. Ryan Edgar
+ * Provided an ArduinoComm object, upload the specified Firmware to it. This relies on the
+ * arduino power reseting when the ArduinoComm connects to it. The power reset triggers the
+ * bootloader to watch for incoming commands from the serial port.
+ *
+ * Use ArduinoCommUpdater.OnStatus API to recieve status updates when each part of the upload
+ * process completes, or if there is an error.
  */
-
-public abstract class ArduinoCommUpdater {
-    public enum ErrorCode { RemovePairing, Connect, IO, Services, Send, Sync, GetParams, SetProgParams, Program, VerifyProgram, Timeout, FW_FileName, FW_CheckSum, FW_StartCode, FW_ContiguousAddressing, Upload };
+public class ArduinoCommUpdater {
+    public enum ErrorCode { Connect, IO, Send, Receive, Services, RemovePairing, Sync, GetParams, SetProgParams, Program, VerifyProgram, Timeout, PinRequired, ServiceIdRequired, FW_FileName, FW_CheckSum, FW_StartCode, FW_ContiguousAddressing, Upload };
 
     public enum StatusCode {Connecting, FileCheck, Connected, Sync, GetParams, SetProgParams, Upload25, Upload50, Upload75, Upload100, Verifying, Complete, Disconnecting, Disconnected}
 
@@ -26,20 +28,63 @@ public abstract class ArduinoCommUpdater {
         void onStatus(StatusCode progress);
     }
 
-    public ArduinoCommUpdater(Activity app, BluetoothDevice device, String fileName) {
+    public ArduinoCommUpdater(Activity app, ArduinoComm device) {
         this.app = app;
         this.device = device;
-        this.fileName = fileName;
+
+        device.addEventHandler(new ArduinoComm.EventHandler() {
+            public void onError(ArduinoComm self, ArduinoComm.ErrorCode code) {
+                ArduinoCommUpdater.this.onError(ErrorCode.valueOf(code.name()));
+            }
+            
+            public void onStatus(ArduinoComm self, ArduinoComm.StatusCode code) {
+                switch(code) {
+                    case Connected:
+                        if (inProgress == ActionCode.Wait) {
+                            Timer t = new Timer();
+                            t.schedule(new TimerTask() {
+                                @Override
+                                public void run() {
+                                    doAction(ActionCode.Sync1);
+                                }
+                            }, 100);
+                        }
+                    break;
+                    
+                    case Disconnected:
+                        if (taskPendingResponse != null) {
+                            taskPendingResponse.cancel();
+                        }
+                        inProgress = ActionCode.Wait;
+                        break;
+                }
+
+                ArduinoCommUpdater.this.onStatus(StatusCode.valueOf(code.name()));
+            }
+            
+            public void onContent(ArduinoComm self, int length, byte[] content) {
+                System.out.print("Recv: ");
+                for (int i = 0; i < length; i += 1) {
+                    System.out.print(Byte.toString(content[i]) + " ");
+                    toParse.add(content[i]);
+                }
+                System.out.println();
+
+                parsePending(toParse);
+            }
+        });
     }
 
     public void setOnStatus(OnStatus status) {
         this.status = status;
     }
 
-    public void upload() {
+    public void upload(InputStream in) {
         completed = false;
-        firmware = new Firmware(app, fileName);
-        if (!firmware.load()) {
+        onStatus(StatusCode.FileCheck);
+
+        firmware = new Firmware();
+        if (!firmware.load(in)) {
             Firmware.ErrorCode ferr = firmware.getError();
             onError(ErrorCode.valueOf(ferr.name()));
             return;
@@ -50,9 +95,7 @@ public abstract class ArduinoCommUpdater {
         fwBytesWritten = 0;
         fwBytesVerified = 0;
 
-        onStatus(StatusCode.FileCheck);
-
-        connect();
+        device.connect();
     }
 
     public boolean success() {
@@ -61,24 +104,21 @@ public abstract class ArduinoCommUpdater {
 
     private boolean completed = false;
     protected Activity app;
-    protected BluetoothDevice device;
-    private String fileName;
+    protected ArduinoComm device;
     private OnStatus status;
     private Firmware firmware;
     private ArrayList<Integer> fwBytes;
     private int fwBytesWritten = 0, fwAddress = 0, fwBytesVerified = 0;
-    private ActionCode inProgress;
+    private ActionCode inProgress = ActionCode.Wait;
     private ArrayList<Byte> toParse = new ArrayList<>();
     protected Timer timer = new Timer();
     private TimerTask taskPendingResponse;
+    private int retries = 0;
     private static final int PAGE_LEN = 0x80;
 
-    protected enum ActionCode {InitSerialService, Sync1, Sync2, Sync3, GetParam1, GetParam2, SetProgParams, SetExProgParams, EnterProgMode, ReadSignature, LoadAddressToWrite, LoadAddressToVerify, ExitProgMode, ReadPage, Program, WriteNext}
+    protected enum ActionCode {Wait, InitSerialService, Sync1, Sync2, Sync3, GetParam1, GetParam2, SetProgParams, SetExProgParams, EnterProgMode, ReadSignature, LoadAddressToWrite, LoadAddressToVerify, ExitProgMode, ReadPage, Program, WriteNext}
     protected interface MessageConstants {
-        int READ = 1;
         int ERROR = 2;
-        int STATUS = 4;
-        int ACTION = 8;
     }
 
     protected class OpTimeout extends TimerTask {
@@ -90,7 +130,6 @@ public abstract class ArduinoCommUpdater {
 
         @Override
         public void run() {
-            System.out.println("Timeout: " + inProgress.name());
             messenger.obtainMessage(MessageConstants.ERROR, ErrorCode.Timeout).sendToTarget();
         }
     }
@@ -101,24 +140,6 @@ public abstract class ArduinoCommUpdater {
             switch (message.what) {
                 case MessageConstants.ERROR:
                     onError((ErrorCode) message.obj);
-                    break;
-
-                case MessageConstants.STATUS:
-                    onStatus((StatusCode) message.obj);
-                    break;
-
-                case MessageConstants.ACTION:
-                    doAction((ActionCode) message.obj);
-                    break;
-
-                case MessageConstants.READ:
-                    byte bytes[] = (byte[]) message.obj;
-                    int length = message.arg1;
-                    for (int i = 0; i < length; i += 1) {
-                        toParse.add(bytes[i]);
-                    }
-
-                    parsePending(toParse);
                     break;
             }
 
@@ -245,23 +266,27 @@ public abstract class ArduinoCommUpdater {
                 break;
 
             case Program:
-                if (validEnding && fwBytesWritten < fwBytes.size()) {
+                if (validEnding) {
+                    fwBytesWritten += PAGE_LEN;
                     fwAddress += (PAGE_LEN / 2); // page_len is in bytes, address is in words.
 
-                    if (fwBytesWritten >= fwBytes.size() * 0.75) {
+                    if (fwBytesWritten >= fwBytes.size()) {
+                        onStatus(StatusCode.Verifying);
+                        fwAddress = firmware.getStartAddress();
+                        fwBytesVerified = 0;
+                        doAction(ActionCode.LoadAddressToVerify);
+                    } else if (fwBytesWritten >= fwBytes.size() * 0.75) {
                         onStatus(StatusCode.Upload75);
+                        doAction(ActionCode.LoadAddressToWrite);
                     } else if (fwBytesWritten >= fwBytes.size() * 0.50) {
                         onStatus(StatusCode.Upload50);
+                        doAction(ActionCode.LoadAddressToWrite);
                     } else if (fwBytesWritten >= fwBytes.size() * 0.25) {
                         onStatus(StatusCode.Upload25);
+                        doAction(ActionCode.LoadAddressToWrite);
+                    } else {
+                        doAction(ActionCode.LoadAddressToWrite);
                     }
-
-                    doAction(ActionCode.LoadAddressToWrite);
-                } else if (validEnding && fwBytesWritten >= fwBytes.size()) {
-                    onStatus(StatusCode.Upload100);
-                    fwAddress = firmware.getStartAddress();
-                    fwBytesVerified = 0;
-                    doAction(ActionCode.LoadAddressToVerify);
                 } else {
                     onError(ErrorCode.Program);
                 }
@@ -308,9 +333,9 @@ public abstract class ArduinoCommUpdater {
 
             case ExitProgMode:
                 if (validEnding) {
-                    onStatus(StatusCode.Complete);
+                    onStatus(StatusCode.Complete); // must set status before completed!
                     completed = true;
-                    disconnect();
+                    device.disconnect();
                 } else {
                     onError(ErrorCode.VerifyProgram);
                 }
@@ -323,12 +348,12 @@ public abstract class ArduinoCommUpdater {
     }
 
     private void handleError(ErrorCode err) {
-        disconnect();
+        device.disconnect();
     }
 
     private StatusCode lastStatus;
     protected void onStatus(final StatusCode stat) {
-        if (lastStatus == stat) {
+        if (lastStatus == stat || completed) {
             return;
         }
 
@@ -363,29 +388,29 @@ public abstract class ArduinoCommUpdater {
             case Sync1:
             case Sync2:
             case Sync3:
-                send(action, new int[] { 0x30, 0x20 });
+                device.send(new int[] { 0x30, 0x20 });
                 break;
             case GetParam1:
-                send(action, new int[] { 0x41, 0x81, 0x20 });
+                device.send(new int[] { 0x41, 0x81, 0x20 });
                 break;
             case GetParam2:
-                send(action, new int[] { 0x41, 0x82, 0x20 });
+                device.send(new int[] { 0x41, 0x82, 0x20 });
                 break;
             case SetProgParams:
-                send(action, new int[] { 0x42, 0x86, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01, 0x03, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x80, 0x04, 0x00, 0x00, 0x00, 0x80, 0x00, 0x20 });
+                device.send(new int[] { 0x42, 0x86, 0x00, 0x00, 0x01, 0x01, 0x01, 0x01, 0x03, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x80, 0x04, 0x00, 0x00, 0x00, 0x80, 0x00, 0x20 });
                 break;
             case SetExProgParams:
-                send(action, new int[] { 0x45, 0x05, 0x04, 0xD7, 0xC2, 0x00, 0x20 });
+                device.send(new int[] { 0x45, 0x05, 0x04, 0xD7, 0xC2, 0x00, 0x20 });
                 break;
             case EnterProgMode:
-                send(action, new int[] { 0x50, 0x20 });
+                device.send(new int[] { 0x50, 0x20 });
                 break;
             case ReadSignature:
-                send(action, new int[] { 0x75, 0x20 });
+                device.send(new int[] { 0x75, 0x20 });
                 break;
             case LoadAddressToVerify:
             case LoadAddressToWrite:
-                send(action, new int[] { 0x55, 0xFF & fwAddress, 0xFF & (fwAddress >> 8), 0x20 });
+                device.send(new int[] { 0x55, 0xFF & fwAddress, 0xFF & (fwAddress >> 8), 0x20 });
                 break;
             case Program:
                 int bytes[] = new int[5 + PAGE_LEN];
@@ -401,36 +426,17 @@ public abstract class ArduinoCommUpdater {
                     }
                 }
                 bytes[4 + PAGE_LEN] = 0x20;
-
-                fwBytesWritten += PAGE_LEN;
-                send(action, bytes);
+                device.send(bytes);
                 break;
             case ReadPage:
-                send(action, new int[] { 0x74, (PAGE_LEN >> 8) & 0xFF, PAGE_LEN & 0xFF, 0x46, 0x20 });
+                device.send(new int[] { 0x74, (PAGE_LEN >> 8) & 0xFF, PAGE_LEN & 0xFF, 0x46, 0x20 });
                 break;
             case ExitProgMode:
-                send(action, new int[] { 0x51, 0x20 });
+                device.send(new int[] { 0x51, 0x20 });
                 break;
-            default:
-                System.out.println("Action Missing For:" + action.name());
         }
 
         taskPendingResponse = new OpTimeout(messenger);
         timer.schedule(taskPendingResponse, 3000);
-    }
-
-    protected abstract  void connect();
-    protected abstract void disconnect();
-    protected abstract void send(ActionCode action, int packet[]);
-
-    // https://stackoverflow.com/questions/38055699/programmatically-pairing-with-a-ble-device-on-android-4-4
-    protected void deleteBondInformation() {
-        try {
-            // FFS Google, just unhide the method.
-            Method m = device.getClass().getMethod("removeBond", (Class[]) null);
-            m.invoke(device, (Object[]) null);
-        } catch (Exception e) {
-
-        }
     }
 }

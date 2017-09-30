@@ -72,12 +72,4 @@ public class ActivityConfig {
         return preferences.getString(keyBtPinCode, "1234");
     }
 
-
-    public void setActiveStation(ArduinoComm arduino) {
-        this.arduino = arduino;
-    }
-
-    public ArduinoComm getActiveStation() {
-        return arduino;
-    }
 }
