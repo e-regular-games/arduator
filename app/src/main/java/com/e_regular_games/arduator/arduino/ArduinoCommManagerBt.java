@@ -92,7 +92,7 @@ public class ArduinoCommManagerBt extends ArduinoCommManager {
     }
 
     @Override
-    public void onRequestPermissionResult(int requestCode, String[] permissions, int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
 
     }
 

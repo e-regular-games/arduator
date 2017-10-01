@@ -46,7 +46,7 @@ public abstract class ArduinoCommManager {
 
     public abstract void createArduinoComm(final BluetoothDevice device);
 
-    public abstract void onRequestPermissionResult(int requestCode, String permissions[], int grantResults[]);
+    public abstract void onRequestPermissionsResult(int requestCode, String permissions[], int grantResults[]);
 
     // must be called from the parent activity in the corresponding similarly name function.
     public void onActivityResult(int requestCode, int responseCode) {

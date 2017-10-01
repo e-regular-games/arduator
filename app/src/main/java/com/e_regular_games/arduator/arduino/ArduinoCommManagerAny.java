@@ -60,8 +60,8 @@ public class ArduinoCommManagerAny extends ArduinoCommManager {
     }
 
     @Override
-    public void onRequestPermissionResult(int requestCode, String[] permissions, int[] grantResults) {
-        any.onRequestPermissionResult(requestCode, permissions, grantResults);
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        any.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
     @Override

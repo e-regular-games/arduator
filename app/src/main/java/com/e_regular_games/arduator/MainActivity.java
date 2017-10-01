@@ -142,6 +142,7 @@ public class MainActivity extends AppCompatActivity {
                     showStatus("Searching...");
                     break;
                 case Error:
+                    bSearching = false;
                     showError("Error!");
                     BtFoundDevice sel = (BtFoundDevice) spnDevices.getSelectedItem();
                     updateButtons();
@@ -378,7 +379,7 @@ public class MainActivity extends AppCompatActivity {
         btnSourceCode.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                String url = "https://gitlab.com/dayoldryebread/arduator";
+                String url = "https://github.com/e-regular-games/arduator";
                 Intent i = new Intent(Intent.ACTION_VIEW);
                 i.setData(Uri.parse(url));
                 startActivity(i);
@@ -429,8 +430,9 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void onRequestPermissionResult(int requestCode, String[] permissions, int[] grantResults) {
-        arduinoMgr.onRequestPermissionResult(requestCode, permissions, grantResults);
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        arduinoMgr.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
     private void fileDisplayName(Uri uri) {
