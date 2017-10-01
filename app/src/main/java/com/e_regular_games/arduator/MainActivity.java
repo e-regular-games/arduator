@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothDevice;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
 import android.provider.OpenableColumns;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -215,8 +216,10 @@ public class MainActivity extends AppCompatActivity {
 
     private void updateAfterBtModeChange(String mode) {
         if (mode.equals("2.0")) {
-            editPin.setVisibility(View.VISIBLE);
-            textPin.setVisibility(View.VISIBLE);
+            if (Build.VERSION.SDK_INT < 23) {
+                editPin.setVisibility(View.VISIBLE);
+                textPin.setVisibility(View.VISIBLE);
+            }
 
             editService.setVisibility(View.GONE);
             textService.setVisibility(View.GONE);

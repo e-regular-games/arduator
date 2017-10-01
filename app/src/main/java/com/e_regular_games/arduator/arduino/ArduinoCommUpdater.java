@@ -47,7 +47,7 @@ public class ArduinoCommUpdater {
                                 public void run() {
                                     doAction(ActionCode.Sync1);
                                 }
-                            }, 100);
+                            }, 200);
                         }
                     break;
                     

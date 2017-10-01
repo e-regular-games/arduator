@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Message;
 
@@ -38,34 +39,38 @@ public class ArduinoCommBt extends ArduinoComm {
                 return;
             }
 
-            if (device.getBondState() != BluetoothDevice.BOND_NONE) {
-                deleteBondInformation();
+            if (Build.VERSION.SDK_INT < 23) {
                 if (device.getBondState() != BluetoothDevice.BOND_NONE) {
-                    onError(ErrorCode.RemovePairing);
-                    return;
-                }
-            }
-
-            IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_PAIRING_REQUEST);
-            app.registerReceiver(new BroadcastReceiver() {
-                @Override
-                public void onReceive(Context context, Intent intent) {
-                    String action = intent.getAction();
-                    if (BluetoothDevice.ACTION_PAIRING_REQUEST.equals(action)) {
-                        // Discovery has found a device. Get the BluetoothDevice
-                        // object and its info from the Intent.
-                        BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                        device.setPin(pinCode.getBytes());
-                        try {
-                            device.getClass().getMethod("cancelBondProcess", (Class[]) null).invoke(device, (Object[]) null);
-                            device.getClass().getMethod("cancelPairingUserInput", boolean.class).invoke(device);
-                        } catch (Exception e) {}
-                        app.unregisterReceiver(this);
+                    deleteBondInformation();
+                    if (device.getBondState() != BluetoothDevice.BOND_NONE) {
+                        onError(ErrorCode.RemovePairing);
+                        return;
                     }
                 }
-            }, filter);
 
-            device.setPin(pinCode.getBytes());
+                IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_PAIRING_REQUEST);
+                app.registerReceiver(new BroadcastReceiver() {
+                    @Override
+                    public void onReceive(Context context, Intent intent) {
+                        String action = intent.getAction();
+                        if (BluetoothDevice.ACTION_PAIRING_REQUEST.equals(action)) {
+                            // Discovery has found a device. Get the BluetoothDevice
+                            // object and its info from the Intent.
+                            BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                            device.setPin(pinCode.getBytes());
+                            try {
+                                device.getClass().getMethod("cancelBondProcess", (Class[]) null).invoke(device, (Object[]) null);
+                                device.getClass().getMethod("cancelPairingUserInput", boolean.class).invoke(device);
+                            } catch (Exception e) {
+                            }
+                            app.unregisterReceiver(this);
+                        }
+                    }
+                }, filter);
+
+                device.setPin(pinCode.getBytes());
+            }
+
             connThread.start();
             onStatus(StatusCode.Connecting);
         }
