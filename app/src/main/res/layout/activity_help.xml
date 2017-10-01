@@ -38,7 +38,7 @@
                 android:id="@+id/textView9"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="1. Create the programmer circuit."
+                android:text="1. Create the Programmer Circuit."
                 android:textSize="16dp"/>
 
             <ImageView
@@ -124,6 +124,7 @@
                 android:id="@+id/textView17"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
                 android:text="3. Create the .hex File"
                 android:textSize="16dp"/>
 
@@ -142,6 +143,36 @@
                 android:layout_marginBottom="20dp"
                 android:text="4. Use Arduator to Upload your Firmware."
                 android:textSize="16dp"/>
+
+            <TextView
+                android:id="@+id/textView21"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                android:text="There are programming circuit designs provided by others online. Any similar working design will function with Arduator. "/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginBottom="20dp"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/textView20"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="top|left"
+                    android:layout_marginRight="10dp"
+                    android:layout_weight="1"
+                    android:text="If you have any questions or need help please contact us."/>
+
+                <Button
+                    android:id="@+id/help_button_email"
+                    android:layout_width="100dp"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="right|center_vertical"
+                    android:text="Send\nE-mail"/>
+            </LinearLayout>
 
         </LinearLayout>
     </ScrollView>
