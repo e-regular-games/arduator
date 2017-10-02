@@ -65,11 +65,51 @@
                 android:text="A switch is used to provide power to an Inverter logic gate. When the switch is ON and a connection is established to the Bluetooth module, the capacitor discharges pulling the RST pin to LOW temporarily. This causes the Arduino to reset and accept bootloader commands."/>
 
             <TextView
+                android:id="@+id/textView22"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="10dp"
+                android:layout_marginTop="20dp"
+                android:text="2. Setup the Bluetooth Module"
+                android:textSize="16dp"/>
+
+            <TextView
+                android:id="@+id/textView23"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="20dp"
+                android:text="Put the Bluetooth module in AT command mode. And set the appropriate baud rate."/>
+
+            <TextView
+                android:id="@+id/textView24"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="20dp"
+                android:layout_marginTop="10dp"
+                android:text="Uno: 115200\nNano: 57600"/>
+
+            <TextView
+                android:id="@+id/textView25"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="20dp"
+                android:layout_marginTop="10dp"
+                android:text="Both require 1 stop bit and no parity. The command to set this on a HC-05 Bluetooth module for use with the Arduino Uno would be:"/>
+
+            <TextView
+                android:id="@+id/textView26"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="20dp"
+                android:layout_marginTop="10dp"
+                android:text="AT+UART=115200,0,0"/>
+
+            <TextView
                 android:id="@+id/textView11"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="20dp"
-                android:text="2. Connect the Arduino and Bluetooth Module"
+                android:text="3. Connect the Arduino and Bluetooth Module"
                 android:textSize="16dp"/>
 
             <ImageView
@@ -125,7 +165,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="10dp"
-                android:text="3. Create the .hex File"
+                android:text="4. Create the .hex File"
                 android:textSize="16dp"/>
 
             <TextView
@@ -141,7 +181,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="20dp"
-                android:text="4. Use Arduator to Upload your Firmware."
+                android:text="5. Use Arduator to Upload your Firmware."
                 android:textSize="16dp"/>
 
             <TextView
