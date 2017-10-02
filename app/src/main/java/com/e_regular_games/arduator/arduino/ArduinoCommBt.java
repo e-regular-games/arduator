@@ -141,7 +141,7 @@ public class ArduinoCommBt extends ArduinoComm {
 
         private boolean connect() {
             try {
-                socket = device.createInsecureRfcommSocketToServiceRecord(SPP_UUID);
+                socket = device.createRfcommSocketToServiceRecord(SPP_UUID);
                 socket.connect();
                 closed = false;
 
@@ -205,13 +205,10 @@ public class ArduinoCommBt extends ArduinoComm {
         // Call this from the main activity to send data to the remote device.
         public void write(int[] bytes) {
             try {
-                System.out.print("Send: ");
                 for (int i = 0; i < bytes.length; i += 1) {
-                    System.out.print(Integer.toString(bytes[i]) + " ");
                     sendStream.write(bytes[i]);
                 }
                 sendStream.flush();
-                System.out.println();
             } catch (IOException e) {
                 if (!closed) {
                     messenger.obtainMessage(MessageConstants.ERROR, ErrorCode.Send).sendToTarget();
