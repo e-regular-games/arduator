@@ -8,7 +8,7 @@ In App help documentation explains how to build a programming circuit and setup/
 **Only Arduino Nano and Uno are currently supported. A programming circuit is required.**
 
 ### Like the code? Want to encourage and support the developer? Buy the App; only $0.99!
-<!-- [<img src="art/google-play-badge.png" alt="Google Play Store" width="300" />](https://play.google.com/store/apps/details?id=com.e_regular_games.arduator) -->
+[<img src="art/google-play-badge.png" alt="Google Play Store" width="300" />](https://play.google.com/store/apps/details?id=com.e_regular_games.arduator)
 **Coming Soon!**
 
 ### The Programming Circuit
